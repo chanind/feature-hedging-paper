@@ -1,5 +1,6 @@
 import time
-from pathlib import Path
+
+import fire
 
 from hedging_paper.saes.matryoshka_sae import (
     MatryoshkaSAERunnerConfig,
@@ -9,7 +10,6 @@ from hedging_paper.scripts.train_batch_topk_matryoshka_sae import (
     train_batch_topk_matryoshka_sae,
 )
 
-EXPERIMENT_NAME = Path(__file__).name
 LAYER = 12
 TRAINING_TOKENS = 500_000_000
 D_IN = 2304
@@ -29,23 +29,23 @@ TOTAL_STEPS = TRAINING_TOKENS // BATCH_SIZE
 
 SEEDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 MULTIPLIERS = [0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 2.0, 5.0]
-COMPOUND_MULTIPLIERS = [True]
 
-script_configs: list[TrainBatchTopkMatryoshkaSaeOptions] = []
 
-for seed in SEEDS:
-    for k in KS:
-        for compound_multipliers in COMPOUND_MULTIPLIERS:
+def run_experiment(
+    base_output_path: str,
+    shared_path: str,
+):
+    script_configs: list[TrainBatchTopkMatryoshkaSaeOptions] = []
+
+    for seed in SEEDS:
+        for k in KS:
             for multiplier in MULTIPLIERS:
                 steps = ALL_STEPS[:-1]
-                multipliers = [multiplier] * len(steps)
-                if compound_multipliers:
-                    multipliers = []
-                    cur_multiplier = 1.0
-                    for i in range(len(steps)):
-                        cur_multiplier *= multiplier
-                        multipliers.insert(0, cur_multiplier)
-                compound_suffix = "-compound" if compound_multipliers else ""
+                multipliers = []
+                cur_multiplier = 1.0
+                for i in range(len(steps)):
+                    cur_multiplier *= multiplier
+                    multipliers.insert(0, cur_multiplier)
 
                 cfg = MatryoshkaSAERunnerConfig(
                     architecture="topk",
@@ -67,7 +67,7 @@ for seed in SEEDS:
                     decoder_heuristic_init=True,
                     normalize_sae_decoder=False,
                     device="cuda",
-                    run_name=f"btk-balanced-matyoshka-4x-layer-{LAYER}-mul-{multiplier}{compound_suffix}-k-{k}-seed-{seed}-{time.strftime('%Y-%m-%dT%H:%M:%S')}",
+                    run_name=f"btk-balanced-matyoshka-4x-layer-{LAYER}-mul-{multiplier}-k-{k}-seed-{seed}-{time.strftime('%Y-%m-%dT%H:%M:%S')}",
                     lr_warm_up_steps=0,
                     lr_decay_steps=0,
                     aux_coefficient=AUX,
@@ -94,12 +94,13 @@ for seed in SEEDS:
                 script_configs.append(
                     TrainBatchTopkMatryoshkaSaeOptions(
                         sae_cfg=cfg,
-                        output_path=f"/home/dev/project-storage/saes/pile/gemma-2-2b-btk-balanced-4x-matryoshka/multiplier-{multiplier}{compound_suffix}/seed-{seed}",
-                        shared_path="/home/dev/project-storage/shared",
+                        output_path=f"{base_output_path}/gemma-2-2b-btk-balanced-4x-matryoshka/multiplier-{multiplier}/seed-{seed}",
+                        shared_path=shared_path,
                     )
                 )
+    for script_config in script_configs:
+        train_batch_topk_matryoshka_sae(script_config)
 
 
 if __name__ == "__main__":
-    for script_config in script_configs:
-        train_batch_topk_matryoshka_sae(script_config)
+    fire.Fire(run_experiment)
