@@ -13,6 +13,7 @@ from sae_lens.sae import SAE_CFG_FILENAME, SAE_WEIGHTS_FILENAME, SPARSITY_FILENA
 from sae_lens.training.sae_trainer import SAETrainer
 from sae_lens.training.training_sae import SAE_WEIGHTS_PATH, Step, TrainStepOutput
 from safetensors.torch import load_file, save_file
+from transformer_lens.loading_from_pretrained import OFFICIAL_MODEL_NAMES
 
 from hedging_paper.saes.util import from_sae_runner_config, get_extra_field_items
 
@@ -139,7 +140,10 @@ class BaseSAE(TrainingSAE):
             layer_num = config["hook_name"].split("model.layers.")[1]
             config["hook_name"] = f"blocks.{layer_num}.hook_resid_post"
             config["model_from_pretrained_kwargs"] = {"center_writing_weights": False}
-        if "/" in config["model_name"]:
+        if (
+            "/" in config["model_name"]
+            and config["model_name"] not in OFFICIAL_MODEL_NAMES
+        ):
             config["model_name"] = config["model_name"].split("/")[1]
 
         cfg_path = path / SAE_CFG_FILENAME
