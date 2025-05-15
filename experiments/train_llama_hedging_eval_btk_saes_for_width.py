@@ -22,7 +22,6 @@ NEW_LATENTS = 64
 
 WIDTHS = [128, 256, 1024, 4096, 16384, 65536]
 SEEDS = [0, 1, 2, 3]
-# SEEDS = [0]
 KS = [25]
 
 
@@ -42,9 +41,9 @@ def run_experiment(
                     model_class_name="AutoModelForCausalLM",
                     hook_name=f"model.layers.{LAYER}",
                     hook_layer=LAYER,
-                    dataset_path="chanind/pile-uncopyrighted-llama-3_2-1024-abbrv-1B",
-                    is_dataset_tokenized=True,
-                    streaming=False,
+                    dataset_path="monology/pile-uncopyrighted",
+                    is_dataset_tokenized=False,
+                    streaming=True,
                     context_size=1024,
                     d_in=D_IN,
                     d_sae=width,

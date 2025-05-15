@@ -26,8 +26,6 @@ class BatchTopK(nn.Module):
 
 
 class BatchTopkSAE(BaseSAE):
-    """Based on https://github.com/bartbussmann/matryoshka_sae/blob/main/sae.py"""
-
     topk_threshold: torch.Tensor
 
     def __init__(self, cfg: BaseSAEConfig):

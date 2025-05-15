@@ -1,7 +1,5 @@
 # type: ignore
 
-"""Copied from https://github.com/bartbussmann/matryoshka_sae/blob/main/sae.py for comparison in tests"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

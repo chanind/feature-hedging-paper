@@ -2,7 +2,7 @@
 name = "hedging-paper"
 version = "0.1.0"
 description = "Hedging Paper"
-authors = ["David Chanin <chanindav@gmail.com>"]
+authors = []
 readme = "README.md"
 
 [tool.poetry.dependencies]

@@ -14,7 +14,7 @@ from transformer_lens import HookedTransformer
 from hedging_paper.saes.base_sae import BaseSAE, BaseSAEConfig
 from hedging_paper.saes.batch_topk_sae import BatchTopK, BatchTopkSAE
 from tests.helpers import build_runner_cfg, build_sae_cfg
-from tests.saes._comparison_saes import BatchTopKSAE as BartBatchTopKSAE
+from tests.saes._comparison_saes import BatchTopKSAE as ReferenceBatchTopKSAE
 
 
 def test_BatchTopK_with_same_number_of_top_features_per_batch():
@@ -233,7 +233,7 @@ def test_BatchTopkSAE_matches_comparison_sae() -> None:
         "device": "cpu",
         "dtype": torch.float32,
     }
-    comparison_sae = BartBatchTopKSAE(comparison_cfg)
+    comparison_sae = ReferenceBatchTopKSAE(comparison_cfg)
 
     # Copy weights to make them identical
     comparison_sae.W_enc.data = batch_topk_sae.W_enc.data

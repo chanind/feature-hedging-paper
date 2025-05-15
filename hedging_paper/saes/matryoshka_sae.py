@@ -263,7 +263,7 @@ class MatryoshkaSAE(BaseSAE):
                 * self.inner_reconstruction_loss(partial_sae_error, i)
             )
 
-            # bart's SAE takes the mean of the loss over the portion of the SAE
+            # XXXX's SAE takes the mean of the loss over the portion of the SAE
             if self.cfg.normalize_reconstruction_losses_by_d_in:
                 inner_reconstruction_loss = inner_reconstruction_loss / self.cfg.d_in
             inner_reconstruction_losses.append(inner_reconstruction_loss)
@@ -338,7 +338,7 @@ class MatryoshkaSAE(BaseSAE):
                 outer_loss / outer_loss_multiplier
             )  # we want this loss before the outer loss multiplier is applied
 
-        # Bart's SAE normalizes the loss by the number of steps
+        # XXXX's SAE normalizes the loss by the number of steps
         # and also divides the mse and l1 losses by the size of the SAE
         if self.cfg.normalize_losses_by_num_matryoshka_steps:
             denom = len(self.matryoshka_steps)

@@ -18,7 +18,7 @@ from hedging_paper.saes.matryoshka_sae import (
 )
 from tests.helpers import build_sae_cfg
 from tests.saes._comparison_saes import (
-    GlobalBatchTopKMatryoshkaSAE as BartGlobalBatchTopKMatryoshkaSAE,
+    GlobalBatchTopKMatryoshkaSAE as ReferenceGlobalBatchTopKMatryoshkaSAE,
 )
 
 BATCH_TOPK_SAE_AND_CFG_VARIANTS = [
@@ -181,7 +181,7 @@ def test_BatchTopkSAE_matryoshka_variants_matches_comparison_sae(
         "dtype": torch.float32,
         "group_sizes": [2, 1, 1, 6],
     }
-    comparison_sae = BartGlobalBatchTopKMatryoshkaSAE(comparison_cfg)
+    comparison_sae = ReferenceGlobalBatchTopKMatryoshkaSAE(comparison_cfg)
 
     # Copy weights to make them identical
     comparison_sae.W_enc.data = batch_topk_sae.W_enc.data
@@ -268,7 +268,7 @@ def test_BatchTopkSAE_matryoshka_variants_matches_dictionary_learning(
 @pytest.mark.parametrize(
     "sae_class, sae_cfg_cls, runner_cfg_cls", BATCH_TOPK_SAE_AND_CFG_VARIANTS
 )
-def test_BatchTopkSAE_matryoshka_variants_matches_bart_losses(
+def test_BatchTopkSAE_matryoshka_variants_matches_reference_losses(
     sae_class, sae_cfg_cls, runner_cfg_cls
 ) -> None:
     # Create our SAE
@@ -303,7 +303,7 @@ def test_BatchTopkSAE_matryoshka_variants_matches_bart_losses(
         "group_sizes": [2, 1, 1, 6],
         "l1_coeff": 0,
     }
-    comparison_sae = BartGlobalBatchTopKMatryoshkaSAE(comparison_cfg)
+    comparison_sae = ReferenceGlobalBatchTopKMatryoshkaSAE(comparison_cfg)
 
     # Copy weights to make them identical
     comparison_sae.W_enc.data = batch_topk_sae.W_enc.data

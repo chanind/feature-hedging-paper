@@ -14,8 +14,6 @@ TREE_SCHEMA_FILE = Path(__file__).parent / "tree.schema.json"
 class TreeFeatureGenerator:
     """
     Hierarchical feature generator
-
-    Based on Noa Nabeshima's Matryoshka SAEs: https://github.com/noanabeshima/matryoshka-saes/blob/main/toy_model.py
     """
 
     children: Sequence["TreeFeatureGenerator"]
