@@ -16,10 +16,6 @@ from safetensors.torch import load_file
 from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
-from hedging_paper.build_sae_dashboard import (
-    BuildSAEDashboardOptions,
-    build_sae_dashboard,
-)
 from hedging_paper.evals.run_all_evals import run_all_evals
 from hedging_paper.saes.base_sae import BaseSAE, BaseSAERunnerConfig
 from hedging_paper.util import DEFAULT_DEVICE_STR, millify
@@ -210,7 +206,6 @@ def train_eval_and_save_sae(
     cfg: BaseSAERunnerConfig,
     output_path: Path | str | Callable[[SAEStats], Path | str],
     shared_path: Path | str,
-    dashboard_cfg: BuildSAEDashboardOptions | None = None,
     run_evals: bool = True,
 ) -> SAEStats:
     checkpoint_path = Path(shared_path) / "checkpoints" / hash_sae_cfg(cfg)
@@ -238,9 +233,6 @@ def train_eval_and_save_sae(
 
     if run_evals:
         run_all_evals(loaded_sae, output_path, Path(shared_path))
-
-    if dashboard_cfg is not None:
-        build_sae_dashboard(loaded_sae, output_path / "dashboard", dashboard_cfg)
 
     return sae_stats
 

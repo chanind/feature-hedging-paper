@@ -6,7 +6,6 @@ authors = []
 readme = "README.md"
 
 [tool.poetry.dependencies]
-sae-dashboard = { git = "https://github.com/chanind/SAEDashboard.git", branch = "memory-fixes" }
 python = "^3.10"
 sae-lens = "^5.10.2"
 transformer-lens = "^2.11.0"

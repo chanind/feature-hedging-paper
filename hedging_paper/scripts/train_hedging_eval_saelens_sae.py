@@ -4,7 +4,6 @@ from pathlib import Path
 from dataclasses_json import DataClassJsonMixin
 from sae_lens import SAE
 
-from hedging_paper.build_sae_dashboard import BuildSAEDashboardOptions
 from hedging_paper.evals.hedging_eval import HedgingEval
 from hedging_paper.evals.run_all_evals import run_eval
 from hedging_paper.saes.base_sae import BaseSAE, BaseSAEConfig, BaseSAERunnerConfig
@@ -18,7 +17,6 @@ class TrainHedgingEvalSaelensSaeOptions(DataClassJsonMixin):
     base_output_path: str | Path
     new_latents: int
     shared_path: str | Path
-    dashboard_cfg: BuildSAEDashboardOptions | None = None
     run_evals: bool = False
     run_hedging_eval: bool = True
     reset_l1_warm_up_steps: bool = False
@@ -70,7 +68,6 @@ def train_hedging_eval_saelens_sae(
             initial_sae_cfg,
             output_path=initial_output_path,
             shared_path=cfg.shared_path,
-            dashboard_cfg=cfg.dashboard_cfg,
             run_evals=cfg.run_evals,
         )
         del sae
@@ -84,7 +81,6 @@ def train_hedging_eval_saelens_sae(
             control_sae_cfg,
             output_path=control_output_path,
             shared_path=cfg.shared_path,
-            dashboard_cfg=cfg.dashboard_cfg,
             run_evals=cfg.run_evals,
         )
         del sae
@@ -97,7 +93,6 @@ def train_hedging_eval_saelens_sae(
             extended_sae_cfg,
             output_path=extended_output_path,
             shared_path=cfg.shared_path,
-            dashboard_cfg=cfg.dashboard_cfg,
             run_evals=cfg.run_evals,
         )
         del sae
