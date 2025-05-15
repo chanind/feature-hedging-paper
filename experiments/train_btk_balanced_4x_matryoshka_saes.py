@@ -16,7 +16,6 @@ D_IN = 2304
 BATCH_SIZE = 4096
 D_SAE = 16 * 2048
 LR = 1e-4
-AUX = 1 / 32
 KS = [40]
 ALL_STEPS = [
     D_SAE // 256,  # 128
@@ -70,7 +69,6 @@ def run_experiment(
                     run_name=f"btk-balanced-matyoshka-4x-layer-{LAYER}-mul-{multiplier}-k-{k}-seed-{seed}-{time.strftime('%Y-%m-%dT%H:%M:%S')}",
                     lr_warm_up_steps=0,
                     lr_decay_steps=0,
-                    aux_coefficient=AUX,
                     lr=LR,
                     n_batches_in_buffer=64,
                     train_batch_size_tokens=BATCH_SIZE,

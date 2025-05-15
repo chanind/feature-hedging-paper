@@ -223,7 +223,7 @@ class BaseSAE(TrainingSAE):
                 loss = mse_loss + l0_loss
                 losses["l0_loss"] = l0_loss
         elif self.cfg.architecture == "topk":
-            topk_loss = self.cfg.aux_coefficient * self.calculate_topk_aux_loss(
+            topk_loss = self.calculate_topk_aux_loss(
                 sae_in=sae_in,
                 sae_out=sae_out,
                 hidden_pre=hidden_pre,

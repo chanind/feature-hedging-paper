@@ -19,7 +19,6 @@ class TrainBatchTopkMatryoshkaSaeOptions(DataClassJsonMixin):
     shared_path: str | Path
     dashboard_cfg: BuildSAEDashboardOptions | None = None
     run_evals: bool = True
-    override_resume_path: str | None = None
 
 
 def train_batch_topk_matryoshka_sae(
@@ -35,6 +34,5 @@ def train_batch_topk_matryoshka_sae(
         shared_path=cfg.shared_path,
         dashboard_cfg=cfg.dashboard_cfg,
         run_evals=cfg.run_evals,
-        override_resume_path=cfg.override_resume_path,
     )
     return sae, stats

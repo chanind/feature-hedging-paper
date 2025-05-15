@@ -6,9 +6,9 @@ authors = ["David Chanin <chanindav@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-sae-dashboard = { git = "https://github.com/chanind/SAEDashboard.git", branch = "memory-fixes", rev = "6be0cee" }
+sae-dashboard = { git = "https://github.com/chanind/SAEDashboard.git", branch = "memory-fixes" }
 python = "^3.10"
-sae-lens = { git = "https://github.com/chanind/SAELens.git", branch = "sae-rethink" }
+sae-lens = "^5.10.2"
 transformer-lens = "^2.11.0"
 jsonschema = "^4.23.0"
 plotly = "^5.24.1"

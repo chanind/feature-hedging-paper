@@ -10,7 +10,6 @@ import wandb
 from datasets import Dataset
 from sae_lens import SAE, SAETrainingRunner
 from sae_lens.evals import run_evals
-from sae_lens.sae_training_runner import _load_checkpoint_state
 from sae_lens.training.sae_trainer import SAETrainer
 from sae_lens.training.training_sae import SAE_WEIGHTS_PATH
 from safetensors.torch import load_file
@@ -102,22 +101,20 @@ class ExtendedSAETrainingRunner(SAETrainingRunner):
         """
         Run the training of the SAE and evaluate.
         """
-        # If we're resuming from a checkpoint, don't try to reset the SAE weights / optimizer state
-        # the checkpoint will have already done this.
-        if self.resume_from_checkpoint is None:
-            if self.cfg.from_pretrained_path is not None:
-                _load_pretrained_weights(
-                    self.sae,
-                    self.cfg.from_pretrained_path,
-                    self.cfg.device,
-                )
 
-            if self.cfg.extend_sae_path is not None:
-                _load_pretrained_weights(
-                    self.sae,
-                    self.cfg.extend_sae_path,
-                    self.cfg.device,
-                )
+        if self.cfg.from_pretrained_path is not None:
+            _load_pretrained_weights(
+                self.sae,
+                self.cfg.from_pretrained_path,
+                self.cfg.device,
+            )
+
+        if self.cfg.extend_sae_path is not None:
+            _load_pretrained_weights(
+                self.sae,
+                self.cfg.extend_sae_path,
+                self.cfg.device,
+            )
         # extend before trying to load from checkpoint
         if self.cfg.extend_sae_latents is not None and self.cfg.extend_sae_latents > 0:
             self.sae.extend_sae(self.cfg.extend_sae_latents)
@@ -158,19 +155,6 @@ class ExtendedSAETrainingRunner(SAETrainingRunner):
 
         # ---- copied from SAELens directly ---
 
-        # Restore trainer state if resuming from checkpoint
-        if self.resume_from_checkpoint is not None:
-            _load_checkpoint_state(
-                trainer=trainer,
-                checkpoint_path_str=self.resume_from_checkpoint,
-                activations_store=self.activations_store,
-                device=self.cfg.device,
-            )
-            print(
-                f"Resuming training from {trainer.n_training_tokens} tokens and {trainer.n_training_steps} steps"
-            )
-            self.sae.step_num = trainer.n_training_steps
-
         self._compile_if_needed()
         sae = self.run_trainer_with_interruption_handling(trainer)
 
@@ -210,17 +194,12 @@ def train_sae(
     cfg: BaseSAERunnerConfig,
     override_model: HookedTransformer | None = None,
     override_dataset: Dataset | None = None,
-    resume_from_checkpoint: str | None = None,
 ) -> SAEStats:
-    if resume_from_checkpoint:
-        sae.load_from_checkpoint(resume_from_checkpoint)
-
     runner = ExtendedSAETrainingRunner(
         cfg,
         override_sae=sae,
         override_model=override_model,
         override_dataset=override_dataset,
-        resume_from_checkpoint=resume_from_checkpoint,
     )
     sae_stats = runner.run_and_eval()
     return sae_stats
@@ -233,22 +212,10 @@ def train_eval_and_save_sae(
     shared_path: Path | str,
     dashboard_cfg: BuildSAEDashboardOptions | None = None,
     run_evals: bool = True,
-    resume_from_checkpoint: bool = True,
-    override_resume_path: str | None = None,
 ) -> SAEStats:
     checkpoint_path = Path(shared_path) / "checkpoints" / hash_sae_cfg(cfg)
     cfg.checkpoint_path = str(checkpoint_path)
-    resume_path = None
-    if resume_from_checkpoint:
-        resume_path = find_latest_checkpoint(checkpoint_path)
-        # this means we've already finished training the SAE.
-        if "final_" in str(resume_path):
-            raise ValueError(
-                "Already finished training this SAE. Please delete the checkpoint directory and run again."
-            )
-    if override_resume_path is not None:
-        resume_path = override_resume_path
-    sae_stats = train_sae(sae, cfg, resume_from_checkpoint=resume_path)
+    sae_stats = train_sae(sae, cfg)
     if isinstance(output_path, Callable):
         output_path = output_path(sae_stats)
     output_path = Path(output_path)

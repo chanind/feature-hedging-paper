@@ -1,17 +1,12 @@
-import copy
 import time
 from pathlib import Path
 
 import torch
 from pytest import approx
-from sae_lens import (
-    TrainingSAE,  # Keep for reference but will use BaseSAEConfig for initialization
-)
 
 from hedging_paper.saes.base_sae import BaseSAE, BaseSAEConfig, BaseSAERunnerConfig
 from hedging_paper.saes.batch_topk_sae import BatchTopkSAE
 from hedging_paper.train_sae import (
-    ExtendedSAETrainingRunner,
     _load_pretrained_weights,
     find_latest_checkpoint,
     hash_sae_cfg,
@@ -192,74 +187,6 @@ def test_find_latest_checkpoint(tmp_path: Path) -> None:
     assert find_latest_checkpoint(checkpoints_path) == str(
         checkpoints_path / checkpoint_files[-1]
     )
-
-
-def test_resume_from_checkpoint(tmp_path: Path) -> None:
-    """Test that training can resume from a checkpoint."""
-
-    # Create a simple config for training
-    runner_cfg = build_runner_cfg(
-        BaseSAERunnerConfig,
-        model_name="gpt2",
-        hook_name="blocks.0.hook_resid_post",
-        dataset_path="roneneldan/TinyStories",
-        d_in=768,
-        d_sae=4,
-        training_tokens=100,
-        store_batch_size_prompts=2,
-        n_batches_in_buffer=2,
-        n_checkpoints=2,
-        checkpoint_path=str(tmp_path / "checkpoints"),
-    )
-
-    # Create a hash directory for this config
-    checkpoint_dir = Path(runner_cfg.checkpoint_path)
-
-    # Create a SAE
-    sae_cfg = BaseSAEConfig.from_sae_runner_config(runner_cfg)
-    sae = TrainingSAE(sae_cfg)
-
-    # Train the SAE - this should create multiple checkpoints
-    runner = ExtendedSAETrainingRunner(
-        cfg=runner_cfg,
-        override_sae=sae,
-    )
-
-    # Run training
-    runner.run_and_eval()
-
-    # Check that multiple checkpoints were created
-    checkpoints = list(checkpoint_dir.glob("*"))
-    assert len(checkpoints) > 1
-
-    # Find the latest non-final checkpoint
-    non_final_checkpoints = [cp for cp in checkpoints if "final_" not in cp.name]
-    assert len(non_final_checkpoints) > 0
-
-    latest_checkpoint = max(non_final_checkpoints, key=lambda x: x.stat().st_mtime)
-
-    # Now try to resume training from this checkpoint
-    resume_cfg = copy.deepcopy(runner_cfg)
-    resume_cfg.training_tokens = 200  # Train for longer
-
-    resume_sae = TrainingSAE(BaseSAEConfig.from_sae_runner_config(resume_cfg))
-
-    resume_runner = ExtendedSAETrainingRunner(
-        cfg=resume_cfg,
-        override_sae=resume_sae,
-        resume_from_checkpoint=str(latest_checkpoint),
-    )
-
-    # Run resumed training
-    resumed_stats = resume_runner.run_and_eval()
-
-    # Check that training continued
-    assert resumed_stats.l0 > 0
-    assert resumed_stats.width == 4
-
-    # Check that a final checkpoint was created
-    final_checkpoint = checkpoint_dir / f"final_{resume_cfg.training_tokens}"
-    assert final_checkpoint.exists()
 
 
 def test_load_pretrained_weights(tmp_path: Path) -> None:
