@@ -26,21 +26,7 @@ poetry run pytest
 
 ### Linting / Formatting
 
-This project uses [Ruff](https://github.com/astral-sh/ruff) for linting and formatting. To set this up with VSCode, install the ruff plugina and add the following to `.vscode/settings.json`:
-
-```json
-{
-  "[python]": {
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit",
-      "source.organizeImports": "explicit"
-    },
-    "editor.defaultFormatter": "charliermarsh.ruff"
-  },
-  "notebook.formatOnSave.enabled": true
-}
-```
+This project uses [Ruff](https://github.com/astral-sh/ruff) for linting and formatting.
 
 ### Pre-commit hook
 
