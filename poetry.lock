@@ -1077,23 +1077,6 @@ files = [
 ]
 
 [[package]]
-name = "eindex-callum"
-version = "0.1.2"
-description = "My interpretation of einops-like indexing"
-optional = false
-python-versions = "*"
-groups = ["main"]
-markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = [
-    {file = "eindex-callum-0.1.2.tar.gz", hash = "sha256:b59837f8010c5545be12e28fdffac50ded1d3d0447d2e9000b63a96793b9495b"},
-    {file = "eindex_callum-0.1.2-py3-none-any.whl", hash = "sha256:d7519c80f897a83ed5a2f52d79ed664cc1f6c04d10419f11bfa6c9626f5c8f80"},
-]
-
-[package.dependencies]
-einops = "*"
-torch = "*"
-
-[[package]]
 name = "einops"
 version = "0.8.1"
 description = "A new flavour of deep learning operations"
@@ -4805,37 +4788,6 @@ tqdm = ">=4.66.4"
 transformer-lens = ">=2.0.0"
 
 [[package]]
-name = "sae-dashboard"
-version = "0.6.4"
-description = "Open-source SAE visualizer, based on Anthropic's published visualizer. Forked / Detached from sae_vis."
-optional = false
-python-versions = "^3.10"
-groups = ["main"]
-markers = "python_version <= \"3.11\" or python_version >= \"3.12\""
-files = []
-develop = false
-
-[package.dependencies]
-dataclasses-json = "^0.6.4"
-datasets = "^2.0.0"
-eindex-callum = "^0.1.0"
-einops = ">=0.7.0"
-jaxtyping = "^0.2.28"
-matplotlib = "^3.8.4"
-rich = "^13.7.1"
-sae-lens = ">=4.0.0"
-safetensors = "^0.4.3"
-torch = "^2.0.0"
-transformer-lens = "^2.2.0,<3.0.0"
-typer = "^0.12.3"
-
-[package.source]
-type = "git"
-url = "https://github.com/chanind/SAEDashboard.git"
-reference = "memory-fixes"
-resolved_reference = "e042716113a916c233b4552f36cc9cd2316509e9"
-
-[[package]]
 name = "sae-lens"
 version = "5.10.2"
 description = "Training and Analyzing Sparse Autoencoders (SAEs)"
@@ -6837,4 +6789,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "be621ebda5aaac1be99000d184354851648acc327e2ab0ad70208ea425e99e13"
+content-hash = "579d06c291e9857cfac6031e3a8528755ac6f2aedb2a90cfaa6ce86f651483a9"
