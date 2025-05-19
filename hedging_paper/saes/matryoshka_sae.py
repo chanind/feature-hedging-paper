@@ -1,6 +1,6 @@
 from collections.abc import Generator, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 import torch
 from sae_lens.training.training_sae import (
@@ -25,20 +25,12 @@ class MatryoshkaSAERunnerConfig(BaseSAERunnerConfig):
     matryoshka_inner_loss_multipliers: list[float] | float = 1.0
     outer_loss_multiplier: float = 1.0
     skip_outer_loss: bool = False
-    matryoshka_reconstruction_loss: Literal["L2", "MSE"] = "MSE"
-    matryoshka_reconstruction_l2_power: float = 1.0
     use_matryoshka_aux_loss: bool = False
     # match original matryoshka loss normalization
     normalize_losses_by_num_matryoshka_steps: bool = False
     normalize_reconstruction_losses_by_d_in: bool = False
     include_bdec_loss: bool = False
-    use_delta_loss: bool = False
-    # loss balancing
-    inner_loss_balancing_enabled: bool = False
-    matryoshka_loss_multiplier_logits: list[float] | float = 0.0
-    update_inner_multipliers_every_n_steps: int = 50
-    update_inner_multipliers_start_step: int = 0
-    update_inner_multipliers_lr: float = 0.01
+    use_delta_loss: bool = False  # whether to stop grads of previous portions
 
 
 @dataclass
@@ -49,20 +41,12 @@ class MatryoshkaSAEConfig(BaseSAEConfig):
     matryoshka_inner_loss_multipliers: list[float] | float = 1.0
     outer_loss_multiplier: float = 1.0
     skip_outer_loss: bool = False
-    matryoshka_reconstruction_loss: Literal["L2", "MSE"] = "MSE"
-    matryoshka_reconstruction_l2_power: float = 1.0
     use_matryoshka_aux_loss: bool = False
     # match original matryoshka loss normalization
     normalize_losses_by_num_matryoshka_steps: bool = False
     normalize_reconstruction_losses_by_d_in: bool = False
     include_bdec_loss: bool = False
-    use_delta_loss: bool = False
-    # loss balancing
-    inner_loss_balancing_enabled: bool = False
-    matryoshka_loss_multiplier_logits: list[float] | float = 0.0
-    update_inner_multipliers_every_n_steps: int = 50
-    update_inner_multipliers_start_step: int = 0
-    update_inner_multipliers_lr: float = 0.01
+    use_delta_loss: bool = False  # whether to stop grads of previous portions
 
     @classmethod
     def from_sae_runner_config(  # type: ignore
@@ -78,7 +62,6 @@ class MatryoshkaSAE(BaseSAE):
     cfg: MatryoshkaSAEConfig  # type: ignore
     inner_l1_loss_multipliers: list[float]
     reconstruction_loss_fn: Callable[[torch.Tensor], torch.Tensor]
-    matryoshka_loss_multiplier_logits: torch.Tensor
 
     def __init__(
         self,
@@ -86,9 +69,7 @@ class MatryoshkaSAE(BaseSAE):
     ):
         super().__init__(cfg)
         self.matryoshka_steps = sorted(set(cfg.matryoshka_steps))
-        self.reconstruction_loss_fn = loss_fn(
-            cfg.matryoshka_reconstruction_loss, cfg.matryoshka_reconstruction_l2_power
-        )
+        self.reconstruction_loss_fn = mse_loss
         if isinstance(cfg.matryoshka_inner_l1_loss_multipliers, list):
             self.inner_l1_loss_multipliers = cfg.matryoshka_inner_l1_loss_multipliers
         else:
@@ -98,33 +79,8 @@ class MatryoshkaSAE(BaseSAE):
         expected_num_losses = len(self.matryoshka_steps)
         if not self.cfg.skip_outer_loss:
             expected_num_losses += 1
-        if isinstance(cfg.matryoshka_loss_multiplier_logits, list):
-            matryoshka_loss_multiplier_logits = cfg.matryoshka_loss_multiplier_logits
-
-        else:
-            matryoshka_loss_multiplier_logits = [
-                cfg.matryoshka_loss_multiplier_logits
-            ] * expected_num_losses
-
-        if len(matryoshka_loss_multiplier_logits) != expected_num_losses:
-            raise ValueError(
-                f"Expected {expected_num_losses} loss multiplier logits, got {len(matryoshka_loss_multiplier_logits)}"
-            )
-        self.register_buffer(
-            "matryoshka_loss_multiplier_logits",
-            torch.tensor(matryoshka_loss_multiplier_logits),
-        )
-        self.matryoshka_loss_multiplier_logits.requires_grad = True
-        self.infrequent_losses = {}
 
     def get_matryoshka_loss_multipliers(self) -> tuple[float, list[float]]:
-        if self.cfg.inner_loss_balancing_enabled:
-            base_multipliers = self.matryoshka_loss_multiplier_logits.softmax(
-                dim=0
-            ).tolist()
-            if self.cfg.skip_outer_loss:
-                return (1.0, base_multipliers)
-            return (base_multipliers[-1], base_multipliers[:-1])
         if isinstance(self.cfg.matryoshka_inner_loss_multipliers, list):
             return (
                 self.cfg.outer_loss_multiplier,
@@ -357,78 +313,7 @@ class MatryoshkaSAE(BaseSAE):
                 output.loss = output.loss + output.losses["l0_loss"]
             if "inner_l1_loss" in output.losses:
                 output.loss = output.loss + output.losses["inner_l1_loss"]
-
-        if (
-            self.cfg.inner_loss_balancing_enabled
-            and self.step_num % self.cfg.update_inner_multipliers_every_n_steps == 0
-        ):
-            # we still want to log the kurtosis loss even if we don't update the coefficients
-            perform_update = (
-                self.step_num >= self.cfg.update_inner_multipliers_start_step
-            )
-            kurtosis_loss = self.update_inner_coefficients(
-                matryoshka_losses, perform_update=perform_update
-            )
-            # hacky way to log kurtosis loss, even though we don't update it often
-            self.infrequent_losses["kurtosis_loss"] = kurtosis_loss
-        # not exactly losses, but useful for logging
-        for i, coeff in enumerate(inner_loss_multipliers):
-            output.losses[f"inner_coeff.{i}"] = coeff
-        if self.cfg.inner_loss_balancing_enabled:
-            for i, logit in enumerate(self.matryoshka_loss_multiplier_logits):
-                output.losses[f"inner_coeff_logits.{i}"] = logit
-        output.losses["outer_loss_multiplier"] = outer_loss_multiplier
-        for loss_name, loss in self.infrequent_losses.items():
-            output.losses[loss_name] = loss
-
         return output
-
-    def update_inner_coefficients(
-        self,
-        matryoshka_losses: list[torch.Tensor],
-        perform_update: bool = True,
-    ) -> torch.Tensor:
-        multipliers = self.matryoshka_loss_multiplier_logits.softmax(dim=0)
-        kurtosis_loss = self._calculate_kurtosis_loss(multipliers, matryoshka_losses)
-        if perform_update:
-            multiplier_grads = torch.autograd.grad(
-                kurtosis_loss, self.matryoshka_loss_multiplier_logits, allow_unused=True
-            )[0]
-            with torch.no_grad():
-                self.matryoshka_loss_multiplier_logits -= (
-                    self.cfg.update_inner_multipliers_lr * multiplier_grads
-                ).detach()
-        return kurtosis_loss.detach()
-
-    def _calculate_kurtosis_loss(
-        self, multipliers: torch.Tensor, matryoshka_losses: list[torch.Tensor]
-    ) -> torch.Tensor:
-        W_enc_grad = torch.zeros_like(self.W_enc)
-        assert len(multipliers) == len(matryoshka_losses)
-        for multiplier, loss in zip(multipliers, matryoshka_losses):
-            W_enc_grad = W_enc_grad + (
-                multiplier
-                * torch.autograd.grad(
-                    loss, self.W_enc, allow_unused=True, retain_graph=True
-                )[0].detach()
-            )
-        # simulate gradient clipping
-        W_enc_grad = W_enc_grad / (W_enc_grad.norm() + 1e-6)
-        modified_W_enc = self.W_enc.detach() - self.cfg.lr * W_enc_grad
-        norm_w_enc = torch.nn.functional.normalize(modified_W_enc, dim=0)
-        prev_portion = 0
-        portion_mean_kurtosis = []
-        portions: list[int | None] = [*self.matryoshka_steps]
-        if not self.cfg.skip_outer_loss:
-            portions.append(None)
-        for portion in portions:
-            kurtosis = _enc_cos_kurtosis(norm_w_enc[:, prev_portion:portion])
-            portion_mean_kurtosis.append(kurtosis.mean())
-            prev_portion = portion
-
-        # we want minimum kurtosis
-        kurtosis_loss = torch.stack(portion_mean_kurtosis).sum()
-        return kurtosis_loss
 
     def max_stage(self) -> int | None:  # noqa: ARG002
         return None
@@ -504,8 +389,6 @@ class MatryoshkaSAE(BaseSAE):
         self.process_state_dict_for_saving(state_dict)
         if "step_num" in state_dict:
             del state_dict["step_num"]
-        if "matryoshka_loss_multiplier_logits" in state_dict:
-            del state_dict["matryoshka_loss_multiplier_logits"]
 
     def load_state_dict(
         self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False
@@ -514,27 +397,6 @@ class MatryoshkaSAE(BaseSAE):
             self.step_num = state_dict["step_num"].item()
             del state_dict["step_num"]  # type: ignore
         return super().load_state_dict(state_dict, strict=strict, assign=assign)
-
-
-def _enc_cos_kurtosis(norm_enc: torch.Tensor) -> torch.Tensor:
-    enc_cos = norm_enc.T @ norm_enc
-    return _calculate_kurtosis_per_row(enc_cos)
-
-
-def _calculate_kurtosis_per_row(matrix: torch.Tensor) -> torch.Tensor:
-    # Calculate mean and std per row
-    # keepdim=True preserves dimensions for broadcasting
-    means = matrix.mean(dim=1, keepdim=True)
-    stds = matrix.std(dim=1, keepdim=True)
-
-    # Calculate standardized values per row
-    standardized = (matrix - means) / stds
-
-    # Calculate kurtosis (4th moment)
-    # Subtract 3 for excess kurtosis (normal distribution has kurtosis of 3)
-    kurtosis = torch.mean(standardized**4, dim=1) - 3
-
-    return kurtosis
 
 
 class BatchTopkMatryoshkaSAE(BatchTopkSAE, MatryoshkaSAE):
@@ -587,27 +449,5 @@ def partial_l0_loss(
     return l0_loss
 
 
-def loss_fn(
-    loss_fn_name: Literal["L2", "MSE"],
-    l2_power: float = 1.0,
-) -> Callable[[torch.Tensor], torch.Tensor]:
-    if loss_fn_name == "L2":
-        return l2_loss(l2_power)
-    elif loss_fn_name == "MSE":
-        return mse_loss
-    else:
-        raise ValueError(f"Invalid loss function name: {loss_fn_name}")
-
-
 def mse_loss(sae_error: torch.Tensor) -> torch.Tensor:
     return sae_error.pow(2).sum(dim=-1).mean()
-
-
-def l2_loss(l2_power: float) -> Callable[[torch.Tensor], torch.Tensor]:
-    def _l2_loss_fn(sae_error: torch.Tensor) -> torch.Tensor:
-        base_loss = sae_error.norm(p=2, dim=-1)
-        if l2_power != 1:
-            base_loss = base_loss.pow(l2_power)
-        return base_loss.mean()
-
-    return _l2_loss_fn
