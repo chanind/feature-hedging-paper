@@ -64,13 +64,10 @@ Below are some helpful tips for working with Poetry:
 ### Citation
 
 ```
-@misc{chanin2025featurehedgingcorrelatedfeatures,
-      title={Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders}, 
-      author={David Chanin and Tomáš Dulka and Adrià Garriga-Alonso},
-      year={2025},
-      eprint={2505.11756},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2505.11756}, 
+@article{chanin2025hedging,
+     title={Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders},
+     author={David Chanin and Tomáš Dulka and Adrià Garriga-Alonso},
+     year={2025},
+     journal={arXiv preprint arXiv:2505.11756}
 }
 ```
