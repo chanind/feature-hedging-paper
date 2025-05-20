@@ -1,0 +1,42 @@
+cff-version: 1.2.0
+message: "If you use this research, please cite it as below."
+authors:
+  - family-names: "Chanin"
+    given-names: "David"
+  - family-names: "Dulka"
+    given-names: "Tomáš"
+  - family-names: "Garriga-Alonso"
+    given-names: "Adrià"
+title: "Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders"
+type: article
+year: 2025
+identifiers:
+  - type: arxiv
+    value: "2505.11756"
+    description: arXiv preprint
+abstract: ""
+url: "https://arxiv.org/abs/2505.11756"
+repository-code: ""
+keywords:
+  - "sparse autoencoders"
+  - "feature correlation"
+  - "machine learning"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Chanin"
+      given-names: "David"
+    - family-names: "Dulka"
+      given-names: "Tomáš"
+    - family-names: "Garriga-Alonso"
+      given-names: "Adrià"
+  title: "Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders"
+  year: 2025
+  url: "https://arxiv.org/abs/2505.11756"
+  identifiers:
+    - type: arxiv
+      value: "2505.11756"
+  archive:
+    - name: "arXiv"
+      location: "https://arxiv.org/"
+  collection-type: "proceedings"
