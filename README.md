@@ -1,6 +1,6 @@
 # Feature Hedging Paper
 
-Code for the paper "Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders".
+Code for the paper [Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders](https://arxiv.org/abs/2505.11756).
 
 ## Repo structure
 
@@ -60,3 +60,17 @@ Below are some helpful tips for working with Poetry:
 - Update the lockfile: `poetry lock`
 - Run a command using the virtual environment: `poetry run <command>`
 - Run a Python file from the CLI as a script (module-style): `poetry run python -m hedging_paper.path.to.file`
+
+### Citation
+
+```
+@misc{chanin2025featurehedgingcorrelatedfeatures,
+      title={Feature Hedging: Correlated Features Break Narrow Sparse Autoencoders}, 
+      author={David Chanin and Tomáš Dulka and Adrià Garriga-Alonso},
+      year={2025},
+      eprint={2505.11756},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2505.11756}, 
+}
+```
