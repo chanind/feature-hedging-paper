@@ -14,13 +14,12 @@ identifiers:
   - type: arxiv
     value: "2505.11756"
     description: arXiv preprint
-abstract: ""
 url: "https://arxiv.org/abs/2505.11756"
-repository-code: ""
 keywords:
   - "sparse autoencoders"
-  - "feature correlation"
-  - "machine learning"
+  - "SAEs"
+  - "interpretability"
+  - "NLP"
 preferred-citation:
   type: article
   authors:
