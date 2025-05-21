@@ -68,10 +68,6 @@ def train_toy_sae(
     lr_decay_steps: int = 0,
     log_to_wandb: bool = False,
     device: torch.device = DEFAULT_DEVICE,
-    sa_cooling_rate: float = 0.99,
-    sa_initial_temp: float = 1.0,
-    sa_final_temp: float = 0.01,
-    sa_step_size: float = 0.01,
     train_batch_size_tokens: int = 4096,
 ) -> None:
     tqdm._instances.clear()  # type: ignore
@@ -92,10 +88,6 @@ def train_toy_sae(
         lr_decay_steps=lr_decay_steps,
         log_to_wandb=log_to_wandb,
         b_dec_init_method="zeros",
-        sa_cooling_rate=sa_cooling_rate,
-        sa_initial_temp=sa_initial_temp,
-        sa_final_temp=sa_final_temp,
-        sa_step_size=sa_step_size,
     )
     toy_model.eval()
     store = FakeActivationsStore(

@@ -20,12 +20,7 @@ from hedging_paper.saes.util import from_sae_runner_config, get_extra_field_item
 
 @dataclass
 class BaseSAERunnerConfig(LanguageModelSAERunnerConfig):
-    sa_initial_temp: float = 1.0
-    sa_final_temp: float = 0.01
-    sa_cooling_rate: float = 0.99
-    sa_step_size: float = 0.01
     fast_forward_steps: int = 0
-    disable_enc_bias: bool = False
     reconstruction_loss: Literal["MSE", "L2"] = "MSE"
     extend_sae_path: str | None = None
     extend_sae_latents: int | None = None
@@ -34,7 +29,6 @@ class BaseSAERunnerConfig(LanguageModelSAERunnerConfig):
 
 @dataclass
 class BaseSAEConfig(TrainingSAEConfig):
-    disable_enc_bias: bool = False
     reconstruction_loss: Literal["MSE", "L2"] = "MSE"
     lr: float = None  # type: ignore
     extend_sae_latents: int | None = None
@@ -59,12 +53,6 @@ class BaseSAE(TrainingSAE):
         super().__init__(cfg)
         self.cfg = cfg  # type: ignore
         self.step_num = 0
-
-    def initialize_weights_complex(self):
-        super().initialize_weights_complex()
-        if self.cfg.disable_enc_bias:
-            self.b_enc.data = torch.zeros_like(self.b_enc)
-            self.b_enc.requires_grad = False
 
     def extend_sae(self, num_latents: int, initial_magnitude: float = 0.1):
         dtype = self.W_dec.dtype

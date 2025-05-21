@@ -90,46 +90,6 @@ def test_train_sae_with_extension(tmp_path: Path):
     assert (tmp_path / "checkpoints" / "final_100" / "sparsity.safetensors").exists()
 
 
-def test_train_batch_topk_sae_disabling_bias(tmp_path: Path) -> None:
-    runner_cfg = build_runner_cfg(
-        BaseSAERunnerConfig,
-        model_name="gpt2",
-        hook_name="blocks.0.hook_resid_post",
-        dataset_path="roneneldan/TinyStories",
-        d_in=768,
-        d_sae=4,
-        training_tokens=1000,
-        store_batch_size_prompts=2,
-        n_batches_in_buffer=2,
-        checkpoint_path=str(tmp_path / "checkpoints"),
-        architecture="topk",
-        activation_fn_kwargs={"k": 2},
-        disable_enc_bias=True,
-    )
-
-    sae_cfg = BaseSAEConfig.from_sae_runner_config(runner_cfg)
-    sae = BatchTopkSAE(sae_cfg)
-
-    sae_stats = train_sae(
-        sae=sae,  # Will be created inside train_sae based on config
-        cfg=runner_cfg,
-    )
-
-    assert torch.allclose(sae.b_enc, torch.zeros_like(sae.b_enc))
-
-    with torch.no_grad():
-        assert sae_stats.sparsity.shape == (4,)
-        assert sae_stats.l0 > 0
-        assert sae_stats.width == 4
-
-    assert (tmp_path / "checkpoints" / "final_1000").exists()
-    assert (tmp_path / "checkpoints" / "final_1000" / "cfg.json").exists()
-    assert (
-        tmp_path / "checkpoints" / "final_1000" / "sae_weights.safetensors"
-    ).exists()
-    assert (tmp_path / "checkpoints" / "final_1000" / "sparsity.safetensors").exists()
-
-
 def test_hash_sae_cfg() -> None:
     """Test that hashing SAE configs produces consistent results."""
     # Create two identical configs
