@@ -20,7 +20,6 @@ from hedging_paper.saes.util import from_sae_runner_config, get_extra_field_item
 
 @dataclass
 class BaseSAERunnerConfig(LanguageModelSAERunnerConfig):
-    fast_forward_steps: int = 0
     reconstruction_loss: Literal["MSE", "L2"] = "MSE"
     extend_sae_path: str | None = None
     extend_sae_latents: int | None = None

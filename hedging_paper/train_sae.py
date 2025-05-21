@@ -13,7 +13,6 @@ from sae_lens.evals import run_evals
 from sae_lens.training.sae_trainer import SAETrainer
 from sae_lens.training.training_sae import SAE_WEIGHTS_PATH
 from safetensors.torch import load_file
-from tqdm.auto import tqdm
 from transformer_lens import HookedTransformer
 
 from hedging_paper.build_sae_dashboard import (
@@ -139,21 +138,6 @@ class ExtendedSAETrainingRunner(SAETrainingRunner):
         )
 
         self.sae.trainer = trainer
-
-        # --- end copied section ---
-
-        if self.cfg.fast_forward_steps > 0:
-            trainer.n_training_steps = self.cfg.fast_forward_steps
-            trainer.n_training_tokens = (
-                self.cfg.fast_forward_steps * self.cfg.train_batch_size_tokens
-            )
-            print(
-                f"Fast forwarding {self.cfg.fast_forward_steps} steps, {trainer.n_training_tokens} tokens"
-            )
-            for _ in tqdm(range(self.cfg.fast_forward_steps)):
-                trainer.activations_store.next_batch()
-
-        # ---- copied from SAELens directly ---
 
         self._compile_if_needed()
         sae = self.run_trainer_with_interruption_handling(trainer)
