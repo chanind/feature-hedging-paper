@@ -4,6 +4,7 @@ from typing import Callable
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import seaborn as sns
@@ -575,3 +576,256 @@ def plot_b_dec_feat_cos_sims_seaborn(
             # Add bbox_inches='tight' to savefig
             plt.savefig(save_path, bbox_inches="tight")
         plt.show()
+
+
+def plot_2d_feature_space(
+    sae: TrainingSAE,
+    toy_model: ToyModel,
+    title: str,
+    angle_degrees: float = 0.0,
+    height: float = 2.5,
+    width: float = 2.5,
+    save_path: str | Path | None = None,
+    show_decoder_bias: bool = False,
+    loc: str = "lower left",
+    latex_legend: bool = False,
+) -> None:
+    """Plot toy model features and SAE latents on a 2D plane.
+
+    Args:
+        sae: The trained SAE
+        toy_model: The toy model with 2 features
+        title: Title for the plot
+        angle_degrees: Angle in degrees that the first feature should be shown at relative to the y-axis
+        height: Figure height in inches
+        width: Figure width in inches
+        save_path: Optional path to save the figure
+        show_decoder_bias: Whether to show the SAE decoder bias as a point
+    """
+    sae.fold_W_dec_norm()
+    if toy_model.embed.weight.shape[1] != 2:
+        raise ValueError(
+            f"This function requires exactly 2 true features, got {toy_model.embed.weight.shape[1]}"
+        )
+
+    # Get the true features from the toy model (shape: d_in x n_features)
+    true_features_full = toy_model.embed.weight.detach().cpu().numpy()  # Shape: (50, 2)
+
+    # Create 2D basis: first axis is Feature 0, second axis is orthogonal in the Feature 0-1 plane
+    feature_0 = true_features_full[:, 0]  # First feature vector (50,)
+    feature_1 = true_features_full[:, 1]  # Second feature vector (50,)
+
+    # Normalize the first feature to create first basis vector
+    basis_1 = feature_0 / np.linalg.norm(feature_0)
+
+    # Create second basis vector orthogonal to first, in the plane spanned by both features
+    # Use Gram-Schmidt orthogonalization
+    feature_1_proj_on_basis_1 = np.dot(feature_1, basis_1) * basis_1
+    basis_2_unnorm = feature_1 - feature_1_proj_on_basis_1
+    basis_2 = basis_2_unnorm / np.linalg.norm(basis_2_unnorm)
+
+    # Apply rotation to the basis vectors if angle is specified
+    angle_rad = np.radians(angle_degrees)
+    rotation_matrix_2d = np.array(
+        [
+            [np.cos(angle_rad), -np.sin(angle_rad)],
+            [np.sin(angle_rad), np.cos(angle_rad)],
+        ]
+    )
+
+    # Rotate the basis vectors in 2D space, then extend back to full dimensionality
+    # Swap order so Feature 0 is y-axis (second component) and orthogonal direction is x-axis
+    basis_2d = np.column_stack(
+        [basis_2, basis_1]
+    )  # Shape: (50, 2) - [orthogonal, feature_0]
+    rotated_basis_2d = basis_2d @ rotation_matrix_2d  # Rotate the basis vectors
+
+    # Project true features onto the rotated 2D basis
+    rotated_features = (true_features_full.T @ rotated_basis_2d).T  # Shape: (2, 2)
+
+    # Project SAE decoder directions onto the rotated 2D basis
+    sae_decoder_full = sae.W_dec.detach().cpu().numpy()  # Shape: (n_latents, 50)
+    rotated_sae = (sae_decoder_full @ rotated_basis_2d).T  # Shape: (2, n_latents)
+
+    # Project SAE decoder bias onto the rotated 2D basis if requested
+    if show_decoder_bias:
+        sae_bias_full = sae.b_dec.detach().cpu().numpy()  # Shape: (50,)
+        rotated_bias = sae_bias_full @ rotated_basis_2d  # Shape: (2,)
+
+    latent_color = "black"
+    latent_alpha = 0.9
+
+    bias_color = "grey"
+    bias_alpha = 0.8
+
+    plt.rcParams.update({"figure.dpi": 150})
+    with plt.rc_context(SEABORN_RC_CONTEXT):
+        fig, ax = plt.subplots(figsize=(width, height))
+
+        color_map = plt.cm.get_cmap("viridis")
+        # Plot true features as solid lines with dots
+        colors = [color_map(0.95), color_map(0.75)]
+
+        if latex_legend:
+            feature_names = ["$f_1$", "$f_2$"]
+        else:
+            feature_names = ["Feature 1", "Feature 2"]
+
+        for i in range(2):
+            # Draw line from origin to feature endpoint
+            ax.plot(
+                [0, rotated_features[0, i]],
+                [0, rotated_features[1, i]],
+                color=colors[i],
+                linewidth=2,
+                label=feature_names[i],
+            )
+            # Add dot at the end
+            ax.plot(
+                rotated_features[0, i],
+                rotated_features[1, i],
+                "o",
+                color=colors[i],
+                markersize=8,
+            )
+
+        # Plot SAE latents as dotted lines with dots
+        n_latents = sae.W_dec.shape[0]  # W_dec has shape (n_latents, d_in)
+        multi_latent = n_latents > 1
+        for i in range(n_latents):
+            # Draw dotted line from origin to latent endpoint
+            ax.plot(
+                [0, rotated_sae[0, i]],
+                [0, rotated_sae[1, i]],
+                color=latent_color,
+                linewidth=1,
+                linestyle="--",
+                alpha=latent_alpha,
+                label=f"SAE Latent {i}" if multi_latent else "SAE Latent",
+            )
+            # Add dot at the end
+            ax.plot(
+                rotated_sae[0, i],
+                rotated_sae[1, i],
+                "o",
+                color=latent_color,
+                markersize=3,
+                alpha=latent_alpha,
+            )
+
+        # Plot SAE decoder bias as dotted line if requested
+        if show_decoder_bias:
+            # Draw dotted line from origin to bias endpoint
+            ax.plot(
+                [0, rotated_bias[0]],  # type: ignore
+                [0, rotated_bias[1]],  # type: ignore
+                color=bias_color,
+                linewidth=1,
+                linestyle="--",
+                alpha=bias_alpha,
+                label="SAE $b_{dec}$" if latex_legend else "SAE Decoder Bias",
+            )
+            # Add dot at the end
+            ax.plot(
+                rotated_bias[0],  # type: ignore
+                rotated_bias[1],  # type: ignore
+                "o",
+                color=bias_color,
+                markersize=3,
+                alpha=bias_alpha,
+            )
+
+        # Set equal aspect ratio and add grid
+        ax.set_aspect("equal")
+
+        # Set axis limits with some padding
+        max_val = (
+            max(np.max(np.abs(rotated_features)), np.max(np.abs(rotated_sae))) * 1.2
+        )
+        ax.set_xlim(-max_val, max_val)
+        ax.set_ylim(-max_val, max_val)
+
+        # Set custom ticks to avoid 0.5, -0.5
+        max_tick = int(np.floor(max_val))
+        ticks = list(range(-max_tick, max_tick + 1))
+        ax.set_xticks(ticks)
+        ax.set_yticks(ticks)
+
+        ax.grid(True, alpha=0.3)
+        ax.axhline(y=0, color="k", linewidth=0.5, alpha=0.3)
+        ax.axvline(x=0, color="k", linewidth=0.5, alpha=0.3)
+
+        # Remove axis labels
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+
+        # Add legend
+        ax.legend(loc=loc)
+
+        fig.suptitle(title)
+
+        # Save if path provided
+        if save_path:
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path, bbox_inches="tight")
+
+        plt.show()
+        plt.close(fig)  # Close the figure to prevent multiple plots
+
+
+def plot_correlation_vs_cosine_similarity(
+    data,
+    title: str = "SAE Cosine Similarity vs Feature Correlation",
+    height: float = 3,
+    width: float = 4,
+    save_path: str | Path | None = None,
+) -> None:
+    """Plot cosine similarity between SAE latents and true features vs correlation.
+
+    Args:
+        data: DataFrame with columns 'corr', 'f1_cos_sim', 'f2_cos_sim'
+        title: Title for the plot
+        height: Figure height in inches
+        width: Figure width in inches
+        save_path: Optional path to save the figure
+    """
+    plt.rcParams.update({"figure.dpi": 150})
+    with plt.rc_context(SEABORN_RC_CONTEXT):
+        fig, ax = plt.subplots(figsize=(width, height))
+
+        # Add x and y axes
+        ax.axhline(y=0, color="k", linewidth=0.5, alpha=0.3)
+        ax.axvline(x=0, color="k", linewidth=0.5, alpha=0.3)
+
+        # Set up labels
+        x_label = "Feature Correlation"
+
+        # Plot Feature 2 cosine similarity only
+        ax.plot(
+            data["corr"],
+            data["f2_cos_sim"],
+            linewidth=1,
+        )
+        # Set labels and title
+        ax.set_xlabel(x_label)
+        ax.set_ylabel("Cosine Similarity")
+        fig.suptitle(title)
+
+        # No legend needed for single line
+
+        # Add grid for better readability
+        ax.grid(True, alpha=0.3)
+
+        # Set y-axis limits to show full range for Feature 2 only
+        y_min = data["f2_cos_sim"].min()
+        y_max = data["f2_cos_sim"].max()
+        y_range = y_max - y_min
+        ax.set_ylim(y_min - 0.1 * y_range, y_max + 0.1 * y_range)
+
+        # Save if path provided
+        if save_path:
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+            plt.savefig(save_path, bbox_inches="tight")
+
+        plt.show()
+        plt.close(fig)

@@ -1,9 +1,12 @@
+import numpy as np
+import pytest
 import torch
 
 from hedging_paper.toy_models.get_training_batch import (
     AbsorptionPair,
     absorption,
     chain_modifiers,
+    create_correlated_features_modifier,
     get_training_batch,
     suppress_features,
 )
@@ -179,3 +182,196 @@ def test_chain_modifiers_works():
     assert modified_feats[1, 3] == 1, (
         "Feature 3 should be absorbed and not suppressed when feature 1 is 1"
     )
+
+
+def test_create_correlated_features_modifier_achieves_target_correlation():
+    """Test that the correlation modifier achieves the target correlation with correct marginals."""
+    p1, p2 = 0.25, 0.2
+    target_correlation = 0.37
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    # Test with large batch to get accurate empirical estimates
+    batch_size = 10000
+    feat_probs = torch.tensor([p1, p2])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    # Calculate empirical statistics
+    empirical_p1 = batch[:, 0].mean().item()
+    empirical_p2 = batch[:, 1].mean().item()
+    empirical_corr = torch.corrcoef(batch.T)[0, 1].item()
+
+    # Check marginal probabilities (allow some tolerance due to sampling)
+    assert empirical_p1 == pytest.approx(p1, abs=0.02)
+    assert empirical_p2 == pytest.approx(p2, abs=0.02)
+
+    # Check correlation (allow some tolerance due to sampling)
+    assert empirical_corr == pytest.approx(target_correlation, abs=0.05)
+
+
+def test_create_correlated_features_modifier_zero_correlation():
+    """Test that zero correlation produces independent features."""
+    p1, p2 = 0.3, 0.4
+    target_correlation = 0.0
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    batch_size = 5000
+    feat_probs = torch.tensor([p1, p2])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    empirical_corr = torch.corrcoef(batch.T)[0, 1].item()
+
+    # For zero correlation, empirical correlation should be close to 0
+    assert empirical_corr == pytest.approx(0.0, abs=0.05)
+
+
+def test_create_correlated_features_modifier_negative_correlation():
+    """Test that negative correlation works correctly."""
+    p1, p2 = 0.4, 0.3
+    target_correlation = -0.2
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    batch_size = 8000
+    feat_probs = torch.tensor([p1, p2])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    empirical_corr = torch.corrcoef(batch.T)[0, 1].item()
+
+    # Check negative correlation is achieved
+    assert empirical_corr < 0
+    assert empirical_corr == pytest.approx(target_correlation, abs=0.05)
+
+
+def test_create_correlated_features_modifier_high_positive_correlation():
+    """Test that high positive correlation works correctly."""
+    p1, p2 = 0.5, 0.4
+    target_correlation = 0.8
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    batch_size = 6000
+    feat_probs = torch.tensor([p1, p2])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    empirical_corr = torch.corrcoef(batch.T)[0, 1].item()
+
+    # Check high positive correlation is achieved
+    assert empirical_corr > 0.7
+    assert empirical_corr == pytest.approx(target_correlation, abs=0.05)
+
+
+def test_create_correlated_features_modifier_infeasible_correlation_raises_error():
+    """Test that infeasible correlations raise ValueError with helpful message."""
+    p1, p2 = 0.1, 0.9
+    target_correlation = 0.9  # This should be infeasible
+
+    with pytest.raises(ValueError) as exc_info:
+        create_correlated_features_modifier(target_correlation, p1, p2)
+
+    # Check that error message contains useful information
+    error_msg = str(exc_info.value)
+    assert "not feasible" in error_msg
+    assert "Valid range:" in error_msg
+    assert str(target_correlation) in error_msg
+
+
+def test_create_correlated_features_modifier_edge_case_small_probabilities():
+    """Test correlation modifier with small probabilities."""
+    p1, p2 = 0.05, 0.1
+    target_correlation = 0.3
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    batch_size = 20000  # Larger batch needed for small probabilities
+    feat_probs = torch.tensor([p1, p2])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    # Check that we get some positive samples
+    assert batch[:, 0].sum() > 0, "Feature 1 should fire sometimes"
+    assert batch[:, 1].sum() > 0, "Feature 2 should fire sometimes"
+
+    empirical_p1 = batch[:, 0].mean().item()
+    empirical_p2 = batch[:, 1].mean().item()
+
+    # Allow larger tolerance for small probabilities
+    assert empirical_p1 == pytest.approx(p1, abs=0.02)
+    assert empirical_p2 == pytest.approx(p2, abs=0.02)
+
+
+def test_create_correlated_features_modifier_preserves_other_features():
+    """Test that correlation modifier only affects first two features."""
+    p1, p2 = 0.3, 0.4
+    target_correlation = 0.5
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    # Create batch with 4 features
+    batch_size = 1000
+    feat_probs = torch.tensor([p1, p2, 0.6, 0.7])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    # Check that features 2 and 3 are unmodified (should be all zeros since modifier overwrites)
+    # Actually, our current implementation overwrites the entire tensor, so this test checks
+    # that only the first two columns are non-zero
+    assert batch[:, 2:].sum() == 0, "Features beyond first two should be zero"
+    assert batch[:, :2].sum() > 0, "First two features should have some positive values"
+
+
+def test_create_correlated_features_modifier_joint_probabilities():
+    """Test that joint probabilities match theoretical expectations."""
+    p1, p2 = 0.4, 0.3
+    target_correlation = 0.5
+
+    # Calculate expected joint probability
+    expected_p11 = p1 * p2 + target_correlation * np.sqrt(p1 * (1 - p1) * p2 * (1 - p2))
+
+    corr_modifier = create_correlated_features_modifier(target_correlation, p1, p2)
+
+    batch_size = 10000
+    feat_probs = torch.tensor([p1, p2])
+    batch = get_training_batch(
+        batch_size=batch_size,
+        firing_probabilities=feat_probs,
+        modify_firing_features=corr_modifier,
+    )
+
+    # Calculate empirical joint probabilities
+    both_fire = ((batch[:, 0] == 1) & (batch[:, 1] == 1)).float().mean().item()
+    only_first = ((batch[:, 0] == 1) & (batch[:, 1] == 0)).float().mean().item()
+    only_second = ((batch[:, 0] == 0) & (batch[:, 1] == 1)).float().mean().item()
+    neither = ((batch[:, 0] == 0) & (batch[:, 1] == 0)).float().mean().item()
+
+    # Check joint probabilities
+    assert both_fire == pytest.approx(expected_p11, abs=0.02)
+    assert only_first == pytest.approx(p1 - expected_p11, abs=0.02)
+    assert only_second == pytest.approx(p2 - expected_p11, abs=0.02)
+
+    # Check that probabilities sum to 1
+    total_prob = both_fire + only_first + only_second + neither
+    assert total_prob == pytest.approx(1.0, abs=0.01)

@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from typing import Callable, NamedTuple
 
+import numpy as np
 import torch
 
 from hedging_paper.util import DEFAULT_DEVICE
@@ -81,6 +82,103 @@ def chain_modifiers(
         return feats
 
     return chain_modifiers_cb
+
+
+def create_correlated_features_modifier(
+    target_correlation: float,
+    p1: float,  # probability of feature 1
+    p2: float,  # probability of feature 2
+) -> Callable[[torch.Tensor], torch.Tensor]:
+    """
+    Create a modifier function that enforces a specific correlation between two features.
+
+    For two binary features with marginal probabilities p1 and p2, and target correlation r,
+    we need to find the joint probabilities:
+    - P(X1=1, X2=1) = p11
+    - P(X1=1, X2=0) = p1 - p11
+    - P(X1=0, X2=1) = p2 - p11
+    - P(X1=0, X2=0) = 1 - p1 - p2 + p11
+
+    The correlation is: r = (p11 - p1*p2) / sqrt(p1*(1-p1)*p2*(1-p2))
+    Solving for p11: p11 = p1*p2 + r*sqrt(p1*(1-p1)*p2*(1-p2))
+
+    Args:
+        target_correlation: The desired correlation coefficient between the two features
+        p1: Marginal probability that feature 1 fires
+        p2: Marginal probability that feature 2 fires
+
+    Returns:
+        A modifier function that can be used with get_training_batch
+
+    Raises:
+        ValueError: If the target correlation is not feasible given the marginal probabilities
+    """
+
+    # Calculate the required joint probability P(X1=1, X2=1)
+    p11 = p1 * p2 + target_correlation * np.sqrt(p1 * (1 - p1) * p2 * (1 - p2))
+
+    # Validate that p11 is feasible
+    if p11 < 0 or p11 > min(p1, p2):
+        max_corr = min(
+            np.sqrt((1 - p1) / (p1) * p2 / (1 - p2)),
+            np.sqrt((1 - p2) / (p2) * p1 / (1 - p1)),
+        )
+        min_corr = -min(
+            np.sqrt(p1 / (1 - p1) * p2 / (1 - p2)),
+            np.sqrt(p2 / (1 - p2) * p1 / (1 - p1)),
+        )
+        raise ValueError(
+            f"Target correlation {target_correlation:.3f} not feasible. "
+            f"Valid range: [{min_corr:.3f}, {max_corr:.3f}]"
+        )
+
+    def modify_features(feats: torch.Tensor) -> torch.Tensor:
+        """
+        Modify the independently sampled features to achieve target correlation.
+
+        Strategy:
+        1. Calculate target counts for each joint outcome
+        2. Randomly assign samples to joint categories to match target distribution
+        """
+        batch_size = feats.shape[0]
+        device = feats.device
+
+        # Target counts for each joint outcome
+        target_11 = int(batch_size * p11)
+        target_10 = int(batch_size * (p1 - p11))
+        target_01 = int(batch_size * (p2 - p11))
+        # target_00 = batch_size - target_11 - target_10 - target_01  # (0,0) samples are already zeros
+
+        # Create new feature matrix
+        new_feats = torch.zeros_like(feats)
+        indices = torch.randperm(batch_size, device=device)
+
+        # Assign samples to joint categories
+        idx = 0
+
+        # (1,1) samples
+        if target_11 > 0:
+            new_feats[indices[idx : idx + target_11], 0] = 1
+            new_feats[indices[idx : idx + target_11], 1] = 1
+            idx += target_11
+
+        # (1,0) samples
+        if target_10 > 0:
+            new_feats[indices[idx : idx + target_10], 0] = 1
+            new_feats[indices[idx : idx + target_10], 1] = 0
+            idx += target_10
+
+        # (0,1) samples
+        if target_01 > 0:
+            new_feats[indices[idx : idx + target_01], 0] = 0
+            new_feats[indices[idx : idx + target_01], 1] = 1
+            idx += target_01
+
+        # (0,0) samples - already zeros
+
+        return new_feats
+
+    return modify_features
 
 
 ######################################################################
