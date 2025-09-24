@@ -17,6 +17,9 @@ def test_build_sae_dashboard(
 ):
     output_path = tmp_path / "dashboard-test"
 
+    # for some reason the default dataset is giving unicode errors
+    gpt2_l4_sae.cfg.dataset_path = "roneneldan/TinyStories"
+
     # Run with minimal settings for fast test
     options = BuildSAEDashboardOptions(
         n_prompts=2,

@@ -12,8 +12,9 @@ def init_sae_to_match_model(
     feature_ordering: torch.Tensor | None = None,
 ) -> None:
     min_dim = min(sae.W_enc.shape[1], toy_model.embed.weight.shape[1])
-    features = toy_model.embed.weight[:, :min_dim]
+    features = toy_model.embed.weight
     if feature_ordering is not None:
         features = features[:, feature_ordering]
+    features = features[:, :min_dim]
     sae.W_enc.data[:, :min_dim] = features + torch.randn_like(features) * noise_level
     sae.W_dec.data = sae.W_enc.data.T.clone()
