@@ -172,3 +172,5 @@ cython_debug/
 
 test/checkpoints/
 plots
+btk_saes_by_width/
+*.pt

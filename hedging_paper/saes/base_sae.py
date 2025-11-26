@@ -1,15 +1,22 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, Literal
 
 import torch
 from sae_lens import (
     LanguageModelSAERunnerConfig,
+    PretrainedSaeDiskLoader,
     TrainingSAE,
     TrainingSAEConfig,
 )
-from sae_lens.sae import SAE_CFG_FILENAME, SAE_WEIGHTS_FILENAME, SPARSITY_FILENAME
+from sae_lens.sae import (
+    SAE_CFG_FILENAME,
+    SAE_WEIGHTS_FILENAME,
+    SPARSITY_FILENAME,
+    handle_config_defaulting,
+    sae_lens_disk_loader,
+)
 from sae_lens.training.sae_trainer import SAETrainer
 from sae_lens.training.training_sae import SAE_WEIGHTS_PATH, Step, TrainStepOutput
 from safetensors.torch import load_file, save_file
@@ -41,6 +48,28 @@ class BaseSAEConfig(TrainingSAEConfig):
 
     def to_dict(self) -> dict[str, Any]:
         return {**super().to_dict(), **get_extra_field_items(self)}
+
+    @classmethod
+    def from_dict(cls, config_dict: dict[str, Any]) -> "BaseSAEConfig":
+        # remove any keys that are not in the dataclass
+        # since we sometimes enhance the config with the whole LM runner config
+        valid_field_names = {field.name for field in fields(cls)}
+        valid_config_dict = {
+            key: val for key, val in config_dict.items() if key in valid_field_names
+        }
+
+        # ensure seqpos slice is tuple
+        # ensure that seqpos slices is a tuple
+        # Ensure seqpos_slice is a tuple
+        if "seqpos_slice" in valid_config_dict:
+            if isinstance(valid_config_dict["seqpos_slice"], list):
+                valid_config_dict["seqpos_slice"] = tuple(
+                    valid_config_dict["seqpos_slice"]
+                )
+            elif not isinstance(valid_config_dict["seqpos_slice"], tuple):
+                valid_config_dict["seqpos_slice"] = (valid_config_dict["seqpos_slice"],)
+
+        return BaseSAEConfig(**valid_config_dict)
 
 
 class BaseSAE(TrainingSAE):
@@ -272,6 +301,23 @@ class BaseSAE(TrainingSAE):
         state_dict = load_file(Path(checkpoint_path) / SAE_WEIGHTS_PATH)
         self.process_state_dict_for_loading(state_dict)
         self.load_state_dict(state_dict)
+
+    @classmethod
+    def load_from_disk(
+        cls,
+        path: str,
+        device: str = "cpu",
+        dtype: str | None = None,
+        converter: PretrainedSaeDiskLoader = sae_lens_disk_loader,
+    ) -> "BaseSAE":
+        overrides = {"dtype": dtype} if dtype is not None else None
+        cfg_dict, state_dict = converter(path, device, cfg_overrides=overrides)
+        cfg_dict = handle_config_defaulting(cfg_dict)
+        sae_cfg = BaseSAEConfig.from_dict(cfg_dict)
+        sae = cls(sae_cfg)
+        sae.process_state_dict_for_loading(state_dict)
+        sae.load_state_dict(state_dict)
+        return sae
 
 
 def l2_loss(preds: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
