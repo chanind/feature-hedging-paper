@@ -102,14 +102,14 @@ class ExtendedSAETrainingRunner(SAETrainingRunner):
         """
 
         if self.cfg.from_pretrained_path is not None:
-            _load_pretrained_weights(
+            load_pretrained_weights(
                 self.sae,
                 self.cfg.from_pretrained_path,
                 self.cfg.device,
             )
 
         if self.cfg.extend_sae_path is not None:
-            _load_pretrained_weights(
+            load_pretrained_weights(
                 self.sae,
                 self.cfg.extend_sae_path,
                 self.cfg.device,
@@ -246,7 +246,7 @@ def find_latest_checkpoint(checkpoints_path: Path) -> str | None:
     return str(max(all_checkpoints, key=lambda x: x.stat().st_mtime))
 
 
-def _load_pretrained_weights(
+def load_pretrained_weights(
     sae: BaseSAE,
     pretrained_path: str,
     device: str,

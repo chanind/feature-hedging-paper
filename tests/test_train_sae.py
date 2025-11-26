@@ -7,9 +7,9 @@ from pytest import approx
 from hedging_paper.saes.base_sae import BaseSAE, BaseSAEConfig, BaseSAERunnerConfig
 from hedging_paper.saes.batch_topk_sae import BatchTopkSAE
 from hedging_paper.train_sae import (
-    _load_pretrained_weights,
     find_latest_checkpoint,
     hash_sae_cfg,
+    load_pretrained_weights,
     train_sae,
 )
 from tests.helpers import build_runner_cfg, build_sae_cfg
@@ -183,7 +183,7 @@ def test_load_pretrained_weights(tmp_path: Path) -> None:
     assert not torch.allclose(new_sae.W_dec, original_sae.W_dec)
 
     # Load pretrained weights
-    _load_pretrained_weights(
+    load_pretrained_weights(
         sae=new_sae,
         pretrained_path=str(tmp_path),
         device="cpu",
